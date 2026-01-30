@@ -1,55 +1,22 @@
 import { Play, Star, Clock, Calendar } from "lucide-react";
 import { useState, useEffect } from "react";
-
-interface FeaturedMovie {
-  id: number;
-  title: string;
-  tagline: string;
-  backdrop: string;
-  rating: number;
-  duration: string;
-  releaseDate: string;
-  genres: string[];
-}
-
-const featuredMovies: FeaturedMovie[] = [
-  {
-    id: 1,
-    title: "Pushpa 2: The Rule",
-    tagline: "The Wildfire Returns",
-    backdrop: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=1920&q=80",
-    rating: 8.7,
-    duration: "3h 20min",
-    releaseDate: "Dec 2024",
-    genres: ["Action", "Drama", "Thriller"],
-  },
-  {
-    id: 2,
-    title: "Kalki 2898 AD",
-    tagline: "The Future Begins",
-    backdrop: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1920&q=80",
-    rating: 8.2,
-    duration: "2h 45min",
-    releaseDate: "Jun 2024",
-    genres: ["Sci-Fi", "Action", "Fantasy"],
-  },
-  {
-    id: 3,
-    title: "Devara: Part 1",
-    tagline: "Fear Him",
-    backdrop: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1920&q=80",
-    rating: 7.9,
-    duration: "2h 58min",
-    releaseDate: "Sep 2024",
-    genres: ["Action", "Thriller"],
-  },
-];
+import { useMovies, type Movie } from "@/hooks/useMovies";
+import { Skeleton } from "@/components/ui/skeleton";
+import BookingModal from "./BookingModal";
 
 const HeroSection = () => {
+  const { data: movies, isLoading } = useMovies();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+
+  // Filter to only available featured movies
+  const featuredMovies = movies?.filter(m => m.availability_status === "available").slice(0, 4) || [];
 
   useEffect(() => {
+    if (featuredMovies.length === 0) return;
+    
     const timer = setInterval(() => {
       setIsAnimating(true);
       setTimeout(() => {
@@ -59,7 +26,47 @@ const HeroSection = () => {
     }, 6000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [featuredMovies.length]);
+
+  const handleBookClick = () => {
+    if (featuredMovies[currentIndex]) {
+      setSelectedMovie(featuredMovies[currentIndex]);
+      setIsBookingOpen(true);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <section className="relative min-h-[70vh] md:min-h-[85vh] flex items-end overflow-hidden bg-secondary">
+        <div className="container mx-auto px-4 pb-12 md:pb-20">
+          <Skeleton className="h-6 w-32 mb-3" />
+          <Skeleton className="h-12 w-80 mb-6" />
+          <div className="flex gap-4 mb-6">
+            <Skeleton className="h-6 w-20" />
+            <Skeleton className="h-6 w-24" />
+            <Skeleton className="h-6 w-28" />
+          </div>
+          <div className="flex gap-2 mb-8">
+            <Skeleton className="h-8 w-20 rounded-full" />
+            <Skeleton className="h-8 w-20 rounded-full" />
+            <Skeleton className="h-8 w-20 rounded-full" />
+          </div>
+          <div className="flex gap-4">
+            <Skeleton className="h-12 w-36 rounded-lg" />
+            <Skeleton className="h-12 w-36 rounded-lg" />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (featuredMovies.length === 0) {
+    return (
+      <section className="relative min-h-[50vh] flex items-center justify-center bg-secondary">
+        <p className="text-muted-foreground">No movies available</p>
+      </section>
+    );
+  }
 
   const currentMovie = featuredMovies[currentIndex];
 
@@ -70,7 +77,7 @@ const HeroSection = () => {
         className={`absolute inset-0 transition-opacity duration-500 ${isAnimating ? "opacity-0" : "opacity-100"}`}
       >
         <img
-          src={currentMovie.backdrop}
+          src={currentMovie.banner_url || currentMovie.poster_url}
           alt={currentMovie.title}
           className="w-full h-full object-cover"
         />
@@ -86,7 +93,7 @@ const HeroSection = () => {
         >
           {/* Tagline */}
           <p className="text-primary font-semibold text-sm md:text-base mb-2 md:mb-3 tracking-wide uppercase">
-            {currentMovie.tagline}
+            Now Showing
           </p>
 
           {/* Title */}
@@ -106,13 +113,13 @@ const HeroSection = () => {
             </div>
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <Calendar className="w-4 h-4 md:w-5 md:h-5" />
-              <span>{currentMovie.releaseDate}</span>
+              <span>{currentMovie.votes} Votes</span>
             </div>
           </div>
 
           {/* Genres */}
           <div className="flex flex-wrap gap-2 mb-6 md:mb-8">
-            {currentMovie.genres.map((genre) => (
+            {currentMovie.genres?.map((genre) => (
               <span
                 key={genre}
                 className="px-3 py-1 text-xs md:text-sm font-medium bg-secondary/80 text-foreground rounded-full border border-border"
@@ -124,7 +131,10 @@ const HeroSection = () => {
 
           {/* CTA Buttons */}
           <div className="flex flex-wrap gap-3 md:gap-4">
-            <button className="flex items-center gap-2 px-6 md:px-8 py-3 md:py-3.5 bg-primary text-primary-foreground font-semibold rounded-lg hover:bg-primary/90 transition-all hover:glow-primary">
+            <button 
+              onClick={handleBookClick}
+              className="flex items-center gap-2 px-6 md:px-8 py-3 md:py-3.5 bg-primary text-primary-foreground font-semibold rounded-lg hover:bg-primary/90 transition-all hover:glow-primary"
+            >
               <Play className="w-4 h-4 md:w-5 md:h-5 fill-current" />
               Book Tickets
             </button>
@@ -155,6 +165,13 @@ const HeroSection = () => {
           ))}
         </div>
       </div>
+
+      {/* Booking Modal */}
+      <BookingModal
+        movie={selectedMovie}
+        isOpen={isBookingOpen}
+        onClose={() => setIsBookingOpen(false)}
+      />
     </section>
   );
 };

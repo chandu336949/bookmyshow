@@ -1,10 +1,22 @@
-import { Search, Menu, X } from "lucide-react";
+import { Search, Menu, X, User, LogOut } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   const navLinks = [
     { label: "Movies", href: "#movies" },
@@ -12,6 +24,11 @@ const Navbar = () => {
     { label: "Plays", href: "#plays" },
     { label: "Sports", href: "#sports" },
   ];
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
@@ -52,9 +69,36 @@ const Navbar = () => {
                 {link.label}
               </a>
             ))}
-            <button className="px-5 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-lg hover:bg-primary/90 transition-all hover:glow-primary">
-              Sign In
-            </button>
+            
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="rounded-full">
+                    <User className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem disabled className="text-muted-foreground">
+                    {user.email}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/bookings")}>
+                    My Bookings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button 
+                onClick={() => navigate("/auth")}
+                className="px-5 py-2 glow-primary"
+              >
+                Sign In
+              </Button>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -97,9 +141,39 @@ const Navbar = () => {
                 {link.label}
               </a>
             ))}
-            <button className="mt-2 px-4 py-2.5 bg-primary text-primary-foreground text-sm font-semibold rounded-lg hover:bg-primary/90 transition-all">
-              Sign In
-            </button>
+            
+            {user ? (
+              <>
+                <button
+                  onClick={() => {
+                    navigate("/bookings");
+                    setIsMenuOpen(false);
+                  }}
+                  className="px-4 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-all text-left"
+                >
+                  My Bookings
+                </button>
+                <button
+                  onClick={() => {
+                    handleSignOut();
+                    setIsMenuOpen(false);
+                  }}
+                  className="px-4 py-2.5 text-sm font-medium text-destructive hover:bg-secondary rounded-lg transition-all text-left"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <Button 
+                onClick={() => {
+                  navigate("/auth");
+                  setIsMenuOpen(false);
+                }}
+                className="mt-2 glow-primary"
+              >
+                Sign In
+              </Button>
+            )}
           </div>
         </div>
       </div>
