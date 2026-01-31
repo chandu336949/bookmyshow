@@ -23,6 +23,7 @@ export type Database = {
           seats: number
           showtime: string
           status: Database["public"]["Enums"]["booking_status"]
+          theater_id: string | null
           total_amount: number
           updated_at: string
           user_id: string
@@ -35,6 +36,7 @@ export type Database = {
           seats?: number
           showtime: string
           status?: Database["public"]["Enums"]["booking_status"]
+          theater_id?: string | null
           total_amount: number
           updated_at?: string
           user_id: string
@@ -47,6 +49,7 @@ export type Database = {
           seats?: number
           showtime?: string
           status?: Database["public"]["Enums"]["booking_status"]
+          theater_id?: string | null
           total_amount?: number
           updated_at?: string
           user_id?: string
@@ -57,6 +60,58 @@ export type Database = {
             columns: ["movie_id"]
             isOneToOne: false
             referencedRelation: "movies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_theater_id_fkey"
+            columns: ["theater_id"]
+            isOneToOne: false
+            referencedRelation: "theaters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      movie_theater_showtimes: {
+        Row: {
+          available_seats: number
+          created_at: string
+          id: string
+          movie_id: string
+          price: number
+          showtime: string
+          theater_id: string
+        }
+        Insert: {
+          available_seats?: number
+          created_at?: string
+          id?: string
+          movie_id: string
+          price?: number
+          showtime: string
+          theater_id: string
+        }
+        Update: {
+          available_seats?: number
+          created_at?: string
+          id?: string
+          movie_id?: string
+          price?: number
+          showtime?: string
+          theater_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movie_theater_showtimes_movie_id_fkey"
+            columns: ["movie_id"]
+            isOneToOne: false
+            referencedRelation: "movies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movie_theater_showtimes_theater_id_fkey"
+            columns: ["theater_id"]
+            isOneToOne: false
+            referencedRelation: "theaters"
             referencedColumns: ["id"]
           },
         ]
@@ -157,6 +212,33 @@ export type Database = {
           phone?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      theaters: {
+        Row: {
+          amenities: string[] | null
+          city: string
+          created_at: string
+          id: string
+          location: string
+          name: string
+        }
+        Insert: {
+          amenities?: string[] | null
+          city?: string
+          created_at?: string
+          id?: string
+          location: string
+          name: string
+        }
+        Update: {
+          amenities?: string[] | null
+          city?: string
+          created_at?: string
+          id?: string
+          location?: string
+          name?: string
         }
         Relationships: []
       }

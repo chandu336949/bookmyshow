@@ -5,7 +5,7 @@ import { useBookings } from "@/hooks/useBookings";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Ticket, Calendar, Clock, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Ticket, Calendar, Clock, CheckCircle, XCircle, Loader2, MapPin } from "lucide-react";
 
 const Bookings = () => {
   const { user, loading: authLoading } = useAuth();
@@ -107,6 +107,13 @@ const Bookings = () => {
                         {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                       </span>
                     </div>
+
+                    {booking.theaters && (
+                      <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4" />
+                        {booking.theaters.name} • {booking.theaters.location}
+                      </p>
+                    )}
 
                     <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1.5">
