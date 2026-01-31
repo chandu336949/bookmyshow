@@ -17,7 +17,7 @@ export const useBookings = () => {
       
       const { data, error } = await supabase
         .from("bookings")
-        .select("*, movies(*)")
+        .select("*, movies(*), theaters(*)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       

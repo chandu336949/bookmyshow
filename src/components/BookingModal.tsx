@@ -5,8 +5,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useCreateBooking, useUpdateBookingStatus } from "@/hooks/useBookings";
+import { useMovieShowtimes, groupShowtimesByTheater, type MovieTheaterShowtime } from "@/hooks/useTheaters";
 import { useNavigate } from "react-router-dom";
-import { Loader2, CheckCircle, CreditCard, Clock, Ticket } from "lucide-react";
+import { Loader2, CheckCircle, CreditCard, Ticket, ArrowLeft, Film } from "lucide-react";
+import TheaterShowtimes, { TheaterShowtimesSkeleton } from "./TheaterShowtimes";
 import type { Movie } from "@/hooks/useMovies";
 
 interface BookingModalProps {
@@ -15,11 +17,11 @@ interface BookingModalProps {
   onClose: () => void;
 }
 
-type BookingStep = "select" | "payment" | "processing" | "success";
+type BookingStep = "theaters" | "seats" | "payment" | "processing" | "success";
 
 const BookingModal = ({ movie, isOpen, onClose }: BookingModalProps) => {
-  const [step, setStep] = useState<BookingStep>("select");
-  const [selectedShowtime, setSelectedShowtime] = useState<string>("");
+  const [step, setStep] = useState<BookingStep>("theaters");
+  const [selectedShowtime, setSelectedShowtime] = useState<MovieTheaterShowtime | null>(null);
   const [seatCount, setSeatCount] = useState<string>("1");
   const [bookingId, setBookingId] = useState<string | null>(null);
 
@@ -28,19 +30,24 @@ const BookingModal = ({ movie, isOpen, onClose }: BookingModalProps) => {
   const { toast } = useToast();
   const createBooking = useCreateBooking();
   const updateBookingStatus = useUpdateBookingStatus();
+  const { data: showtimes, isLoading: isLoadingShowtimes } = useMovieShowtimes(movie?.id);
 
-  const showtimes = movie?.showtimes ? (movie.showtimes as string[]) : [];
-  const totalAmount = movie ? movie.price * parseInt(seatCount) : 0;
+  const groupedShowtimes = showtimes ? groupShowtimesByTheater(showtimes) : [];
+  const totalAmount = selectedShowtime ? selectedShowtime.price * parseInt(seatCount) : 0;
 
   const handleClose = () => {
-    setStep("select");
-    setSelectedShowtime("");
+    setStep("theaters");
+    setSelectedShowtime(null);
     setSeatCount("1");
     setBookingId(null);
     onClose();
   };
 
-  const handleProceedToPayment = async () => {
+  const handleSelectShowtime = (showtime: MovieTheaterShowtime) => {
+    setSelectedShowtime(showtime);
+  };
+
+  const handleProceedToSeats = () => {
     if (!user) {
       toast({
         title: "Login Required",
@@ -51,19 +58,26 @@ const BookingModal = ({ movie, isOpen, onClose }: BookingModalProps) => {
       return;
     }
 
-    if (!selectedShowtime || !movie) {
+    if (!selectedShowtime) {
       toast({
         title: "Select Showtime",
-        description: "Please select a showtime to continue.",
+        description: "Please select a theater and showtime to continue.",
         variant: "destructive",
       });
       return;
     }
 
+    setStep("seats");
+  };
+
+  const handleProceedToPayment = async () => {
+    if (!selectedShowtime || !movie) return;
+
     try {
       const booking = await createBooking.mutateAsync({
         movie_id: movie.id,
-        showtime: selectedShowtime,
+        theater_id: selectedShowtime.theater_id,
+        showtime: selectedShowtime.showtime,
         seats: parseInt(seatCount),
         total_amount: totalAmount,
         status: "pending",
@@ -118,50 +132,127 @@ const BookingModal = ({ movie, isOpen, onClose }: BookingModalProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md bg-card border-border">
+      <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto bg-card border-border">
         <DialogHeader>
           <DialogTitle className="text-foreground flex items-center gap-2">
-            <Ticket className="w-5 h-5 text-primary" />
-            {step === "success" ? "Booking Confirmed!" : `Book: ${movie.title}`}
+            {step === "theaters" && (
+              <>
+                <Film className="w-5 h-5 text-primary" />
+                Theaters Showing {movie.title}
+              </>
+            )}
+            {step === "seats" && (
+              <>
+                <Ticket className="w-5 h-5 text-primary" />
+                Select Seats
+              </>
+            )}
+            {step === "payment" && (
+              <>
+                <CreditCard className="w-5 h-5 text-primary" />
+                Payment
+              </>
+            )}
+            {step === "processing" && "Processing..."}
+            {step === "success" && (
+              <>
+                <CheckCircle className="w-5 h-5 text-green-500" />
+                Booking Confirmed!
+              </>
+            )}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          {step === "select" && (
+          {/* Step 1: Theater & Showtime Selection */}
+          {step === "theaters" && (
             <>
-              {/* Movie Info */}
-              <div className="flex gap-4">
+              {/* Movie Info Banner */}
+              <div className="flex gap-4 p-3 bg-secondary rounded-lg">
                 <img
                   src={movie.poster_url}
                   alt={movie.title}
-                  className="w-20 h-28 object-cover rounded-lg"
+                  className="w-16 h-24 object-cover rounded-md"
                 />
                 <div className="flex-1">
                   <h3 className="font-semibold text-foreground">{movie.title}</h3>
                   <p className="text-sm text-muted-foreground">{movie.duration}</p>
                   <p className="text-sm text-muted-foreground">{movie.genres?.join(", ")}</p>
-                  <p className="text-primary font-semibold mt-2">₹{movie.price} per ticket</p>
                 </div>
               </div>
 
-              {/* Showtime Selection */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  Select Showtime
-                </label>
-                <Select value={selectedShowtime} onValueChange={setSelectedShowtime}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a showtime" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {showtimes.map((time) => (
-                      <SelectItem key={time} value={time}>
-                        {time}
-                      </SelectItem>
+              {/* Theaters List */}
+              <div className="space-y-3">
+                <h2 className="text-lg font-semibold text-foreground">
+                  Select Theater & Showtime
+                </h2>
+                
+                {isLoadingShowtimes ? (
+                  <TheaterShowtimesSkeleton />
+                ) : groupedShowtimes.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No showtimes available for this movie.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {groupedShowtimes.map(({ theater, showtimes }) => (
+                      <TheaterShowtimes
+                        key={theater.id}
+                        theater={theater}
+                        showtimes={showtimes}
+                        selectedShowtime={selectedShowtime}
+                        onSelectShowtime={handleSelectShowtime}
+                      />
                     ))}
-                  </SelectContent>
-                </Select>
+                  </div>
+                )}
+              </div>
+
+              {/* Selected Summary */}
+              {selectedShowtime && (
+                <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
+                  <p className="text-sm text-foreground">
+                    <span className="font-medium">Selected:</span>{" "}
+                    {selectedShowtime.theaters.name} at {selectedShowtime.showtime}
+                  </p>
+                  <p className="text-sm text-primary font-semibold">
+                    ₹{selectedShowtime.price} per ticket
+                  </p>
+                </div>
+              )}
+
+              <Button
+                className="w-full"
+                onClick={handleProceedToSeats}
+                disabled={!selectedShowtime}
+              >
+                Continue to Seat Selection
+              </Button>
+            </>
+          )}
+
+          {/* Step 2: Seat Selection */}
+          {step === "seats" && selectedShowtime && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setStep("theaters")}
+                className="mb-2"
+              >
+                <ArrowLeft className="w-4 h-4 mr-1" />
+                Back to Theaters
+              </Button>
+
+              {/* Booking Summary */}
+              <div className="p-4 bg-secondary rounded-lg space-y-2">
+                <h3 className="font-semibold text-foreground">{movie.title}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {selectedShowtime.theaters.name} • {selectedShowtime.showtime}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {selectedShowtime.theaters.location}
+                </p>
               </div>
 
               {/* Seat Selection */}
@@ -172,7 +263,7 @@ const BookingModal = ({ movie, isOpen, onClose }: BookingModalProps) => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {[1, 2, 3, 4, 5, 6].map((num) => (
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                       <SelectItem key={num} value={num.toString()}>
                         {num} {num === 1 ? "Seat" : "Seats"}
                       </SelectItem>
@@ -188,9 +279,9 @@ const BookingModal = ({ movie, isOpen, onClose }: BookingModalProps) => {
               </div>
 
               <Button
-                className="w-full glow-primary"
+                className="w-full"
                 onClick={handleProceedToPayment}
-                disabled={!selectedShowtime || createBooking.isPending}
+                disabled={createBooking.isPending}
               >
                 {createBooking.isPending ? (
                   <>
@@ -204,7 +295,8 @@ const BookingModal = ({ movie, isOpen, onClose }: BookingModalProps) => {
             </>
           )}
 
-          {step === "payment" && (
+          {/* Step 3: Payment */}
+          {step === "payment" && selectedShowtime && (
             <>
               <div className="text-center space-y-4">
                 <CreditCard className="w-16 h-16 mx-auto text-primary" />
@@ -220,7 +312,7 @@ const BookingModal = ({ movie, isOpen, onClose }: BookingModalProps) => {
                 </div>
               </div>
               <Button
-                className="w-full glow-primary"
+                className="w-full"
                 onClick={handleMockPayment}
               >
                 Pay Now (Mock)
@@ -228,13 +320,14 @@ const BookingModal = ({ movie, isOpen, onClose }: BookingModalProps) => {
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => setStep("select")}
+                onClick={() => setStep("seats")}
               >
                 Back
               </Button>
             </>
           )}
 
+          {/* Step 4: Processing */}
           {step === "processing" && (
             <div className="text-center py-8 space-y-4">
               <Loader2 className="w-16 h-16 mx-auto text-primary animate-spin" />
@@ -247,7 +340,8 @@ const BookingModal = ({ movie, isOpen, onClose }: BookingModalProps) => {
             </div>
           )}
 
-          {step === "success" && (
+          {/* Step 5: Success */}
+          {step === "success" && selectedShowtime && (
             <div className="text-center py-4 space-y-4">
               <CheckCircle className="w-20 h-20 mx-auto text-green-500" />
               <div>
@@ -255,16 +349,15 @@ const BookingModal = ({ movie, isOpen, onClose }: BookingModalProps) => {
                 <p className="text-sm text-muted-foreground mt-2">
                   {parseInt(seatCount)} {parseInt(seatCount) === 1 ? "ticket" : "tickets"} for {movie.title}
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  Showtime: {selectedShowtime}
-                </p>
               </div>
-              <div className="p-4 bg-secondary rounded-lg text-left">
-                <p className="text-xs text-muted-foreground">Booking Details</p>
-                <p className="text-sm text-foreground">Movie: {movie.title}</p>
-                <p className="text-sm text-foreground">Time: {selectedShowtime}</p>
-                <p className="text-sm text-foreground">Seats: {seatCount}</p>
-                <p className="text-sm font-semibold text-primary">Total: ₹{totalAmount.toFixed(2)}</p>
+              <div className="p-4 bg-secondary rounded-lg text-left space-y-1">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Booking Details</p>
+                <p className="text-sm text-foreground"><strong>Movie:</strong> {movie.title}</p>
+                <p className="text-sm text-foreground"><strong>Theater:</strong> {selectedShowtime.theaters.name}</p>
+                <p className="text-sm text-foreground"><strong>Location:</strong> {selectedShowtime.theaters.location}</p>
+                <p className="text-sm text-foreground"><strong>Showtime:</strong> {selectedShowtime.showtime}</p>
+                <p className="text-sm text-foreground"><strong>Seats:</strong> {seatCount}</p>
+                <p className="text-sm font-semibold text-primary"><strong>Total:</strong> ₹{totalAmount.toFixed(2)}</p>
               </div>
               <Button className="w-full" onClick={handleClose}>
                 Done
