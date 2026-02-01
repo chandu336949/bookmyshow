@@ -7,9 +7,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCreateBooking, useUpdateBookingStatus } from "@/hooks/useBookings";
 import { useMovieShowtimes, groupShowtimesByTheater, type MovieTheaterShowtime } from "@/hooks/useTheaters";
 import { useNavigate } from "react-router-dom";
-import { Loader2, CheckCircle, CreditCard, Ticket, ArrowLeft, Film, Armchair } from "lucide-react";
+import { Loader2, ArrowLeft, Film, Armchair, Ticket, CreditCard, CheckCircle } from "lucide-react";
 import TheaterShowtimes, { TheaterShowtimesSkeleton } from "./TheaterShowtimes";
 import SeatSelector from "./SeatSelector";
+import PaymentStep from "./PaymentStep";
+import BookingConfirmation from "./BookingConfirmation";
 import type { Movie } from "@/hooks/useMovies";
 
 interface BookingModalProps {
@@ -26,6 +28,8 @@ const BookingModal = ({ movie, isOpen, onClose }: BookingModalProps) => {
   const [seatCount, setSeatCount] = useState<string>("1");
   const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
   const [bookingId, setBookingId] = useState<string | null>(null);
+  const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
 
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -43,6 +47,8 @@ const BookingModal = ({ movie, isOpen, onClose }: BookingModalProps) => {
     setSeatCount("1");
     setSelectedSeatIds([]);
     setBookingId(null);
+    setPaymentId(null);
+    setIsPaymentProcessing(false);
     onClose();
   };
 
@@ -102,10 +108,10 @@ const BookingModal = ({ movie, isOpen, onClose }: BookingModalProps) => {
     }
   };
 
-  const handleMockPayment = async () => {
+  const handlePayment = async () => {
     if (!bookingId) return;
 
-    setStep("processing");
+    setIsPaymentProcessing(true);
 
     // Simulate payment processing delay (2 seconds)
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -120,19 +126,21 @@ const BookingModal = ({ movie, isOpen, onClose }: BookingModalProps) => {
         paymentId: mockPaymentId,
       });
 
+      setPaymentId(mockPaymentId);
+      setIsPaymentProcessing(false);
       setStep("success");
       
       toast({
         title: "🎉 Payment Successful!",
-        description: `Your tickets for ${movie?.title} have been booked. Payment ID: ${mockPaymentId}`,
+        description: `Your tickets for ${movie?.title} have been booked.`,
       });
     } catch (error) {
+      setIsPaymentProcessing(false);
       toast({
         title: "Payment Failed",
         description: "Unable to process payment. Please try again.",
         variant: "destructive",
       });
-      setStep("payment");
     }
   };
 
@@ -161,13 +169,12 @@ const BookingModal = ({ movie, isOpen, onClose }: BookingModalProps) => {
                 Choose Your Seats
               </>
             )}
-            {step === "payment" && (
+            {(step === "payment" || step === "processing") && (
               <>
                 <CreditCard className="w-5 h-5 text-primary" />
-                Payment
+                Complete Payment
               </>
             )}
-            {step === "processing" && "Processing..."}
             {step === "success" && (
               <>
                 <CheckCircle className="w-5 h-5 text-green-500" />
@@ -357,74 +364,38 @@ const BookingModal = ({ movie, isOpen, onClose }: BookingModalProps) => {
           )}
 
           {/* Step 4: Payment */}
-          {step === "payment" && selectedShowtime && (
-            <>
-              <div className="text-center space-y-4">
-                <CreditCard className="w-16 h-16 mx-auto text-primary" />
-                <div>
-                  <h3 className="font-semibold text-foreground">Mock Payment</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Click below to simulate payment processing
-                  </p>
-                </div>
-                <div className="p-4 bg-secondary rounded-lg space-y-2">
-                  <p className="text-sm text-muted-foreground">Seats: {selectedSeatIds.join(", ")}</p>
-                  <p className="text-sm text-muted-foreground">Amount to pay</p>
-                  <p className="text-3xl font-bold text-primary">₹{totalAmount.toFixed(2)}</p>
-                </div>
-              </div>
-              <Button
-                className="w-full"
-                onClick={handleMockPayment}
-              >
-                Pay Now (Mock)
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => setStep("seatSelection")}
-              >
-                Back
-              </Button>
-            </>
+          {(step === "payment" || step === "processing") && selectedShowtime && (
+            <PaymentStep
+              movieTitle={movie.title}
+              theaterName={selectedShowtime.theaters.name}
+              theaterLocation={selectedShowtime.theaters.location}
+              showtime={selectedShowtime.showtime}
+              selectedSeats={selectedSeatIds}
+              totalAmount={totalAmount}
+              isProcessing={isPaymentProcessing}
+              onPay={handlePayment}
+              onBack={() => setStep("seatSelection")}
+            />
           )}
 
-          {/* Step 5: Processing */}
-          {step === "processing" && (
-            <div className="text-center py-8 space-y-4">
-              <Loader2 className="w-16 h-16 mx-auto text-primary animate-spin" />
-              <div>
-                <h3 className="font-semibold text-foreground">Processing Payment...</h3>
-                <p className="text-sm text-muted-foreground">
-                  Please wait while we confirm your payment
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Step 6: Success */}
+          {/* Step 5: Success */}
           {step === "success" && selectedShowtime && (
-            <div className="text-center py-4 space-y-4">
-              <CheckCircle className="w-20 h-20 mx-auto text-green-500" />
-              <div>
-                <h3 className="text-xl font-bold text-foreground">Booking Confirmed!</h3>
-                <p className="text-sm text-muted-foreground mt-2">
-                  {parseInt(seatCount)} {parseInt(seatCount) === 1 ? "ticket" : "tickets"} for {movie.title}
-                </p>
-              </div>
-              <div className="p-4 bg-secondary rounded-lg text-left space-y-1">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Booking Details</p>
-                <p className="text-sm text-foreground"><strong>Movie:</strong> {movie.title}</p>
-                <p className="text-sm text-foreground"><strong>Theater:</strong> {selectedShowtime.theaters.name}</p>
-                <p className="text-sm text-foreground"><strong>Location:</strong> {selectedShowtime.theaters.location}</p>
-                <p className="text-sm text-foreground"><strong>Showtime:</strong> {selectedShowtime.showtime}</p>
-                <p className="text-sm text-foreground"><strong>Seats:</strong> {selectedSeatIds.join(", ")}</p>
-                <p className="text-sm font-semibold text-primary"><strong>Total:</strong> ₹{totalAmount.toFixed(2)}</p>
-              </div>
-              <Button className="w-full" onClick={handleClose}>
-                Done
-              </Button>
-            </div>
+            <BookingConfirmation
+              movieTitle={movie.title}
+              theaterName={selectedShowtime.theaters.name}
+              theaterLocation={selectedShowtime.theaters.location}
+              showtime={selectedShowtime.showtime}
+              selectedSeats={selectedSeatIds}
+              totalAmount={totalAmount}
+              paymentId={paymentId || "N/A"}
+              bookingDate={new Date().toLocaleDateString("en-IN", {
+                weekday: "short",
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+              onClose={handleClose}
+            />
           )}
         </div>
       </DialogContent>
